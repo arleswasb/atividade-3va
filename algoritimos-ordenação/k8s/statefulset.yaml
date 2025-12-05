@@ -1,0 +1,48 @@
+# k8s/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: algoritmos-coord
+  labels:
+    app: algoritmos
+spec:
+  # Número de processos exigidos pela tarefa (3)
+  replicas: 3
+  serviceName: "algoritmos-svc"
+  selector:
+    matchLabels:
+      app: algoritmos
+  template:
+    metadata:
+      labels:
+        app: algoritmos
+    spec:
+      containers:
+      - name: processo-coordenacao
+        image: algoritmos-av2:v3 # Imagem Docker que acabamos de construir
+        imagePullPolicy: IfNotPresent # Não tentar baixar se já existir localmente
+        ports:
+        - containerPort: 8080 # Porta que o Uvicorn está escutando
+
+        env:
+          # --- Variável Crucial para a Identificação do Processo ---
+          # Injeta o nome do Pod (ex: algoritmos-coord-0) no código Python
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          # --------------------------------------------------------
+          
+          # Variáveis para simulação de Atraso (Cenário 2 do Multicast)
+          # NOTA: O processo que tiver DELAY_PROC_ID=X e receber DELAY_MSG_ID, irá atrasar o ACK.
+          # Você pode mudar esses valores antes do deploy para forçar o atraso em diferentes cenários.
+          - name: DELAY_MSG_ID
+            value: "" # Exemplo: "msg-001"
+          - name: DELAY_PROC_ID
+            value: "-1" # Exemplo: "1" (para o processo 1)
+          
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+

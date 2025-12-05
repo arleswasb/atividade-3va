@@ -1,0 +1,18 @@
+# k8s/service.yaml
+# Headless Service para que os Pods possam ser endereçados individualmente
+apiVersion: v1
+kind: Service
+metadata:
+  name: algoritmos-svc
+  labels:
+    app: algoritmos
+spec:
+  ports:
+  - port: 8080
+    name: http
+  # O tipo ClusterIP garante que o serviço só é acessível internamente
+  type: ClusterIP 
+  selector:
+    app: algoritmos
+  # Essential: O cluster permite resolver endereços como 'algoritmos-coord-0.algoritmos-svc'
+  clusterIP: None
