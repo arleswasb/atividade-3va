@@ -3,16 +3,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: algoritmos-svc
-  labels:
-    app: algoritmos
+  name: algoritmos-coord-service
 spec:
-  ports:
-  - port: 8080
-    name: http
-  # O tipo ClusterIP garante que o serviço só é acessível internamente
-  type: ClusterIP 
-  selector:
-    app: algoritmos
-  # Essential: O cluster permite resolver endereços como 'algoritmos-coord-0.algoritmos-svc'
+  # Adicionar esta linha torna o serviço "headless"
+  # Isso é crucial para que o StatefulSet crie os registros DNS corretos para cada pod.
   clusterIP: None
+  selector:
+    app: algoritmos-coord
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080

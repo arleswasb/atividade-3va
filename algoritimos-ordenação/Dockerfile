@@ -1,24 +1,23 @@
-# Dockerfile
+# Define a imagem base
+FROM python:3.9-slim
 
-# Stage 1: Imagem base para o ambiente de execução Python
-FROM python:3.11-slim-buster
-
-# Define variáveis de ambiente
-ENV PYTHONUNBUFFERED 1
-ENV APP_PORT 8080
-
-# Cria o diretório de trabalho na imagem
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia e instala as dependências
-COPY requirements.txt /app/
+# Copia os arquivos de dependências
+COPY requirements.txt .
+
+# Instala as dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia o código-fonte
-# A ordem é importante: primeiro as dependências para aproveitar o cache do Docker
-COPY src/ /app/src/
+# Cria o diretório de logs
+RUN mkdir -p /app/logs
 
-# Comando de execução. 
-# Ele inicia o servidor Uvicorn rodando a aplicação 'app' do módulo 'main'.
-# O host 0.0.0.0 garante que o serviço será acessível de fora do contêiner.
+# Copia o código da aplicação (mantendo a estrutura do pacote src)
+COPY ./src ./src
+
+# Expõe a porta que a aplicação vai rodar
+EXPOSE 8080
+
+# Comando para iniciar a aplicação (aponta para src.main)
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]

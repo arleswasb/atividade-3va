@@ -1,13 +1,24 @@
 # src/models.py
-
 from pydantic import BaseModel
-from typing import Optional
+from typing import List
 
 class Message(BaseModel):
-    """Estrutura da mensagem para o Multicast."""
+    """
+    Representa uma mensagem de multicast com todos os seus metadados.
+    """
     sender_id: int
     message_id: str
     timestamp: int
     content: str
-    # Opcional para o ACK, mas é útil para tipagem
-    delay_ms: Optional[int] = 0
+
+class Ack(BaseModel):
+    """
+    Representa uma mensagem de confirmação (ACK).
+    """
+    message_id: str
+    process_id: int
+
+class SCRequest(BaseModel):
+    """Mensagem de Requisição de Seção Crítica (SC)."""
+    request_ts: int
+    process_id: int

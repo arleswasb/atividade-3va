@@ -1,114 +1,152 @@
-# src/main.py
-from fastapi import FastAPI, HTTPException
+# src/main.py (VERSÃO FINAL)
+import asyncio
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from .communication import send_acks_to_all_peers
 import uvicorn
 import os
-import asyncio
-import httpx
 import uuid
+from typing import Set
+
+# Importações centralizadas
+from src.logger import logger
+from src.config import PROCESS_ID, PEERS, PEER_PORT
+from src.models import Message, Ack, SCRequest
+from src.process_logic import LOGICAL_CLOCK
+
+app = FastAPI(title=f"Processo P{PROCESS_ID} - Algoritmos Distribuídos")
+
+# --- Gerenciamento de Tarefas em Background ---
+# Manter uma referência forte às tarefas para evitar que sejam coletadas pelo garbage collector
+background_tasks: Set[asyncio.Task] = set()
 
 
-# Importações dos módulos de lógica e modelos
-from .process_logic import (
-    PROCESS_ID, LOGICAL_CLOCK, PEERS, 
-    update_clock, receive_and_enqueue_message, receive_ack
-)
-from .models import Message
+def create_background_task(coroutine):
+    """Cria e gerencia uma tarefa em background."""
+    logger.info(f"Agendando a corrotina '{coroutine.__name__}' para execução em background.")
+    task = asyncio.create_task(coroutine)
+    background_tasks.add(task)
+    # Adiciona um callback para remover a tarefa do conjunto quando ela terminar
+    task.add_done_callback(background_tasks.discard)
 
-app = FastAPI(title=f"Processo P{PROCESS_ID} - Multicast")
-PORT = 8080 
-PEER_PORT = 8080 # Porta padrão para comunicação entre Pods
 
-# Endpoint base para obter o status
+# --- Endpoints da API ---
+
 @app.get("/")
 def read_root():
-    """Retorna o estado atual do processo."""
-    return {
-        "process_id": PROCESS_ID, 
-        "current_clock": LOGICAL_CLOCK, 
-        "status": "Running",
-        "peers": PEERS
-    }
+    """Endpoint de status para verificar a saúde e o estado atual do processo."""
+    return {"process_id": PROCESS_ID, "current_clock": LOGICAL_CLOCK, "status": "Running"}
 
-# --- ENDPOINTS DE RECEBIMENTO ---
+# --- Endpoints para Exclusão Mútua (Q2) ---
+
+@app.post("/request-resource", status_code=202)
+async def request_resource_endpoint():
+    """Inicia o pedido de acesso à região crítica."""
+    from .process_logic import request_resource_access
+    logger.info("Endpoint /request-resource chamado.")
+    create_background_task(request_resource_access())
+    return {"status": "Resource request initiated. Processing in background."}
+
+@app.post("/receive-request", status_code=202)
+async def receive_request_endpoint(request: SCRequest):
+    """Recebe um pedido de recurso de outro processo."""
+    from .process_logic import handle_resource_request
+    logger.info(f"Recebido REQUEST de P{request.process_id} com TS={request.request_ts}.")
+    create_background_task(handle_resource_request(request.request_ts, request.process_id))
+    return {"status": "Request received. Processing in background."}
+
+@app.post("/receive-reply", status_code=202)
+async def receive_reply_endpoint(sender_id: int):
+    """Recebe uma resposta (REPLY) de outro processo."""
+    from .process_logic import handle_reply
+    logger.info(f"Recebido REPLY de P{sender_id}.")
+    create_background_task(handle_reply())
+    return {"status": "Reply received. Processing in background."}
+
+# --- Endpoints para Eleição de Líder (Q3) ---
+
+@app.post("/start-election", status_code=202)
+async def start_election_endpoint():
+    """Inicia uma eleição de líder."""
+    from .process_logic import start_election
+    logger.info("Endpoint /start-election chamado. Iniciando eleição...")
+    create_background_task(start_election())
+    return {"status": "Election started. Processing in background."}
+
+@app.post("/receive-election", status_code=202)
+async def receive_election_endpoint(candidate_id: int):
+    """Recebe uma mensagem de ELECTION de outro processo."""
+    from .process_logic import handle_election_message
+    logger.info(f"Recebido ELECTION de P{candidate_id}.")
+    create_background_task(handle_election_message(candidate_id))
+    return {"status": "Election message received. Processing in background."}
+
+@app.post("/receive-answer", status_code=202)
+async def receive_answer_endpoint(peer_id: int):
+    """Recebe uma mensagem de ANSWER durante uma eleição."""
+    from .process_logic import handle_answer_message
+    logger.info(f"Recebido ANSWER de P{peer_id}.")
+    create_background_task(handle_answer_message(peer_id))
+    return {"status": "Answer message received. Processing in background."}
+
+@app.post("/receive-coordinator", status_code=202)
+async def receive_coordinator_endpoint(leader_id: int):
+    """Recebe notificação de um novo líder."""
+    from .process_logic import handle_coordinator_message
+    logger.info(f"Recebido COORDINATOR notificando P{leader_id} como novo líder.")
+    create_background_task(handle_coordinator_message(leader_id))
+    return {"status": "Coordinator message received. Processing in background."}
+
+# --- Endpoints da API para Multicast (Q1) - Mantidos para compatibilidade ---
 
 @app.post("/message")
 async def receive_message_endpoint(message: Message):
-    """Recebe uma nova mensagem de multicast de um par."""
-    print(f"Recebido MENSAGEM de P{message.sender_id} (TS: {message.timestamp})")
-    # A chamada deve ser AWAIT
-    await receive_and_enqueue_message(message)
+    from .process_logic import receive_and_enqueue_message
+    logger.info(f"Recebido MENSAGEM de P{message.sender_id} (TS: {message.timestamp})")
+    create_background_task(receive_and_enqueue_message(message))
     return {"status": "Message received and enqueued."}
 
 @app.post("/ack")
-async def receive_ack_endpoint(ack_data: dict):
-    """Recebe um ACK de um processo para uma mensagem."""
-    message_id = ack_data.get("message_id")
-    if not message_id:
-        raise HTTPException(status_code=400, detail="message_id is required")
-
-    # Simula um atraso de ACK para testar o Cenário 2 da AV2
-    if message_id == os.environ.get("DELAY_MSG_ID", "") and PROCESS_ID == int(os.environ.get("DELAY_PROC_ID", -1)):
-        print(f"[{LOGICAL_CLOCK}] --- SIMULANDO ATRASO de ACK para {message_id} (P{PROCESS_ID}) ---")
-        await asyncio.sleep(5) # Atraso de 5 segundos
-
-    print(f"Recebido ACK para mensagem {message_id}")
-    receive_ack(message_id)
+async def receive_ack_endpoint(ack: Ack):
+    from .process_logic import receive_ack
+    logger.info(f"Recebido ACK para mensagem {ack.message_id}")
+    receive_ack(ack.message_id)
     return {"status": "ACK processed."}
-
-# --- ENDPOINT DE ENVIO (START) ---
 
 @app.post("/send")
 async def send_multicast_message(content: str):
-    """Endpoint que um cliente externo chama para disparar o envio de uma mensagem."""
-    
-    # 1. Preparar a Mensagem
-    message_id = str(uuid.uuid4())
-    new_timestamp = update_clock() # Incrementa e obtém o novo TS
-    
+    from .communication import send_message_to_peers
+    from .process_logic import update_clock, receive_and_enqueue_message
+
+    # Lógica para acionar o atraso de teste
+    is_delayed_message = "com atraso" in content.lower()
+    msg_id = "MSG_PARA_ATRASAR" if is_delayed_message else str(uuid.uuid4())
+
+    new_timestamp = update_clock()
     new_message = Message(
         sender_id=PROCESS_ID,
-        message_id=message_id,
+        message_id=msg_id,
         timestamp=new_timestamp,
         content=content
     )
     
-    # 2. Enviar a mensagem para todos os pares (EXCETO a si mesmo)
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        tasks = []
-        for peer_id in range(len(PEERS)):
-            peer_host = f"{PEERS[peer_id]}" 
-            
-            if peer_id == PROCESS_ID:
-                continue 
+    log_msg = f"Iniciando multicast da mensagem {new_message.message_id}"
+    if is_delayed_message:
+        log_msg += " (com gatilho de atraso)"
+    logger.info(log_msg)
 
-            # Constrói o FQDN (Fully Qualified Domain Name) para o Pod
-            peer_host = f"{PEERS[peer_id]}.algoritmos-svc"
-            url = f"http://{peer_host}:{PEER_PORT}/message"
-            print(f"P{PROCESS_ID} enviando MENSAGEM {message_id} para {peer_host}...")
-            
-            tasks.append(client.post(url, json=new_message.dict()))
-            
-        # Esperar que todas as chamadas de envio terminem
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-    # 3. O remetente também deve processar a sua própria mensagem (e disparar seus ACKs)
-    # A chamada deve ser AWAIT
-    await receive_and_enqueue_message(new_message) 
+    create_background_task(send_message_to_peers(new_message))
+    create_background_task(receive_and_enqueue_message(new_message))
     
-    # NOTA: receive_and_enqueue_message irá enviar o ACK do remetente para todos, e
-    # os outros processos receberão a mensagem e enviarão seus ACKs de volta.
-    # O ciclo está fechado.
-
     return JSONResponse(
-        content={"status": "Multicast initiated successfully.", "message_id": message_id, "timestamp": new_timestamp},
+        content={"status": "Multicast initiated.", "message_id": new_message.message_id},
         status_code=200
     )
+# --- Função para iniciar o servidor ---
 
-# Função principal de inicialização
+def start():
+    """Inicia o servidor uvicorn."""
+    logger.info(f"--- VERSÃO FINAL --- Iniciando processo P{PROCESS_ID} na porta {PEER_PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=PEER_PORT)
+
 if __name__ == "__main__":
-    # O nome do POD é a forma mais robusta de obter o ID em K8s
-    print(f"Iniciando Processo P{PROCESS_ID} com Relógio Inicial: {LOGICAL_CLOCK}")
-    # O host '0.0.0.0' é necessário para expor o servidor dentro do contêiner
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    start()
