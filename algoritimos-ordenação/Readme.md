@@ -2,7 +2,7 @@
 
 Implementação completa de **3 algoritmos fundamentais de sistemas distribuídos** usando Python/FastAPI, Docker e Kubernetes.
 
-## 📋 Conteúdo
+## Conteúdo
 
 - **Q1**: Multicast com Ordenação Total (Algoritmo de Lamport)
 - **Q2**: Exclusão Mútua Distribuída (Algoritmo de Ricart & Agrawala)
@@ -10,7 +10,7 @@ Implementação completa de **3 algoritmos fundamentais de sistemas distribuído
 
 ---
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ### Infraestrutura
 - **Plataforma**: Kubernetes (Minikube) + Docker
@@ -49,7 +49,7 @@ projeto/
 
 ---
 
-## 📚 Questões Implementadas
+## Questões Implementadas
 
 ### Q1: Multicast com Ordenação Total (Lamport)
 
@@ -148,7 +148,7 @@ cd testes && bash teste_Q3.sh
 
 ---
 
-## 🚀 Como Executar
+## Como Executar
 
 ### Pré-requisitos
 
@@ -227,7 +227,7 @@ minikube stop
 
 ---
 
-## 📊 Detalhes de Implementação
+## Detalhes de Implementação
 
 ### Relógio Lógico de Lamport
 ```python
@@ -262,7 +262,7 @@ if PROCESS_ID > candidate_id:
 
 ---
 
-## 🔍 Verificação de Funcionamento
+## Verificação de Funcionamento
 
 ### Q1 - Ordem Total Mantida
 ```
@@ -284,7 +284,7 @@ Verificar: Logs mostram "P2 é o novo LÍDER" em todas as eleições
 
 ---
 
-## 📝 Notas Importantes
+## Notas Importantes
 
 1. **Timeout na Eleição**: 3 segundos - Se nenhuma resposta, o processo se torna líder
 2. **Timeout em Requisições HTTP**: 5 segundos - Evita travamentos
@@ -294,7 +294,7 @@ Verificar: Logs mostram "P2 é o novo LÍDER" em todas as eleições
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 | Problema | Solução |
 |----------|---------|
@@ -305,7 +305,7 @@ Verificar: Logs mostram "P2 é o novo LÍDER" em todas as eleições
 
 ---
 
-## ��‍💻 Arquivos Principais
+## Arquivos Principais
 
 | Arquivo | Responsabilidade |
 |---------|------------------|
@@ -317,12 +317,3 @@ Verificar: Logs mostram "P2 é o novo LÍDER" em todas as eleições
 | `models.py` | Modelos: Message, Ack, SCRequest |
 
 ---
-
-## ✅ Validação Final
-
-Todos os 3 algoritmos foram implementados, testados e validados:
-- ✅ Q1: Multicast com Ordem Total - FUNCIONANDO
-- ✅ Q2: Exclusão Mútua Distribuída - FUNCIONANDO
-- ✅ Q3: Eleição de Líder (Bully) - FUNCIONANDO
-
-Pronto para avaliação! 🎓
