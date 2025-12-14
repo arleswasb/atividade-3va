@@ -5,11 +5,6 @@
 echo "Iniciando teste de Exclusão Mútua (Q2)..."
 echo "-------------------------------------------------"
 
-# Limpa os logs antigos para garantir que estamos vendo apenas os resultados deste teste
-echo "Limpando logs antigos dos pods..."
-kubectl logs algoritmos-coord-0 > /dev/null
-kubectl logs algoritmos-coord-1 > /dev/null
-kubectl logs algoritmos-coord-2 > /dev/null
 
 
 # Inicia os port-forwards em background
@@ -47,8 +42,17 @@ echo "================================================="
 grep -E "Pedindo acesso|Adiado pedido|ACESSO OBTIDO|TRABALHO CONCLUÍDO|Enviando REPLY para" | \
 sort -k 1,1
 
+echo "Limpando port-forwards..."
+kill $PF_PID_0 $PF_PID_1 $PF_PID_2 2>/dev/null
+# Limpar os pods (criar novos para testes futuros)
+echo "Reiniciando pods..."
+kubectl delete pod algoritmos-coord-0 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-1 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-2 > /dev/null 2>&1
+
 echo "================================================="
 echo "Teste concluído."
 echo ""
+
 
 # O trap no início do script cuidará de encerrar os PIDs.

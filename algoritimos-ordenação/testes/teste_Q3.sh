@@ -104,9 +104,12 @@ echo "TESTE 3: Processo 2 detecta falha e inicia eleição"
 echo "=========================================="
 echo ""
 
+
 # Matar Process 0 e 1 para simular falha
 echo "Matando Processo 0 para simular falha do líder..."
 kubectl delete pod algoritmos-coord-0 > /dev/null 2>&1
+echo "Matando Processo 1 para simular falha do líder..."
+kubectl delete pod algoritmos-coord-1 > /dev/null 2>&1
 
 sleep 3
 
@@ -125,6 +128,12 @@ echo ""
 echo "=========================================="
 echo "Limpando port-forwards..."
 kill $PF_PID_0 $PF_PID_1 $PF_PID_2 2>/dev/null
+
+# Limpar os pods (criar novos para testes futuros)
+echo "Reiniciando pods..."
+kubectl delete pod algoritmos-coord-0 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-1 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-2 > /dev/null 2>&1
 
 echo "Teste Q3 finalizado!"
 

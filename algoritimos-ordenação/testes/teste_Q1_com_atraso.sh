@@ -19,12 +19,6 @@ trap cleanup EXIT
 echo "Iniciando teste da Q1 (com atraso)..."
 echo "-------------------------------------------------"
 
-# Limpa os logs de execuções anteriores para clareza
-echo "Limpando logs antigos..."
-kubectl exec algoritmos-coord-0 -- sh -c 'echo "" > /app/logs/process.log'
-kubectl exec algoritmos-coord-1 -- sh -c 'echo "" > /app/logs/process.log'
-kubectl exec algoritmos-coord-2 -- sh -c 'echo "" > /app/logs/process.log'
-
 # Inicia o port-forward para cada pod em segundo plano
 echo "Iniciando port-forwards..."
 kubectl port-forward algoritmos-coord-0 8080:8080 &
@@ -49,15 +43,25 @@ echo "Enviando mensagem 03 do Processo 2..."
 curl -s -X POST "http://127.0.0.1:8082/send?content=mensagem%2003" &
 
 
-# Aguarda o processamento, incluindo o atraso de 10s
+# Aguarda o processamento, incluindo o atraso de 30s
 echo "Aguardando 20 segundos para processamento (incluindo o atraso)..."
 sleep 20
 
 echo ""
 echo "Coletando e processando os resultados..."
 
-# Coleta os logs de todos os processos, filtrando apenas as mensagens de processamento (PROCESSADO)
-LOGS=$(kubectl logs --all-containers=true --selector=app=algoritmos-coord --tail=500 | grep "PROCESSADO")
+# Exibir logs de processamento
+extract_processed_messages "algoritmos-coord-0" "Processo 0"
+extract_processed_messages "algoritmos-coord-1" "Processo 1"
+extract_processed_messages "algoritmos-coord-2" "Processo 2"
+
+# Coletar todos os logs de processamento para ordenação cronológica
+LOGS=""
+for pod in algoritmos-coord-0 algoritmos-coord-1 algoritmos-coord-2; do
+    pod_logs=$(kubectl logs "$pod" --since=2m --timestamps 2>/dev/null | grep "PROCESSADO" | awk -v p="$pod" '{print $1, $2, p, $0}')
+    LOGS+="$pod_logs"$'\n'
+done    
+
 
 # Processa e exibe os logs em ordem cronológica
 echo "================================================="
@@ -65,5 +69,16 @@ echo "        CRONOLOGIA DO PROCESSAMENTO (Q1 COM ATRASO)     "
 echo "================================================="
 echo "$LOGS" | sort -k1,2
 echo "================================================="
+
+
+# Limpar port-forwards
+echo "Limpando port-forwards..."
+kill $PF_PID_0 $PF_PID_1 $PF_PID_2 2>/dev/null
+# Limpar os pods (criar novos para testes futuros)
+echo "Reiniciando pods..."
+kubectl delete pod algoritmos-coord-0 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-1 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-2 > /dev/null 2>&1
+
 
 echo "Teste concluído."

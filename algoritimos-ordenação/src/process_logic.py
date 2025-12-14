@@ -55,13 +55,16 @@ def update_clock(received_timestamp: int = 0) -> int:
 async def receive_and_enqueue_message(message: Message):
     """Processa uma mensagem de multicast recebida."""
     from src.communication import send_acks_to_all_peers
-    
-    new_ts = update_clock(message.timestamp)
+
+    # Atualiza o relógio local com o timestamp recebido, mas
+    # mantém a ordenação pela timestamp ORIGINAL da mensagem.
+    update_clock(message.timestamp)
 
     with STATE_LOCK:
-        heapq.heappush(PENDING_QUEUE, (new_ts, message.sender_id, message))
+        order_ts = message.timestamp
+        heapq.heappush(PENDING_QUEUE, (order_ts, message.sender_id, message))
         ACK_TABLE[message.message_id] = ACK_TABLE.get(message.message_id, 0) + 1
-        logger.info(f"Mensagem {message.message_id} enfileirada com TS={new_ts}. ACK inicial: 1.")
+        logger.info(f"Mensagem {message.message_id} enfileirada com TS_ORIG={order_ts}. ACK inicial: 1.")
 
     await send_acks_to_all_peers(message.message_id)
     try_to_process_messages()

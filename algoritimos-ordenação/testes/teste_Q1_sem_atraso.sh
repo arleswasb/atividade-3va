@@ -87,6 +87,11 @@ echo ""
 # Limpar port-forwards
 echo "Limpando port-forwards..."
 kill $PF_PID_0 $PF_PID_1 $PF_PID_2 2>/dev/null
+# Limpar os pods (criar novos para testes futuros)
+echo "Reiniciando pods..."
+kubectl delete pod algoritmos-coord-0 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-1 > /dev/null 2>&1
+kubectl delete pod algoritmos-coord-2 > /dev/null 2>&1
 
 echo ""
 echo "Teste Q1 (sem atraso) finalizado!"

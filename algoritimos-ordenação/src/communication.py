@@ -24,8 +24,8 @@ async def send_message_to_peers(message: Message):
                 logger.error(f"Falha ao enviar mensagem para {peer_name}: {e}")
 
 async def send_acks_to_all_peers(message_id: str):
-    """Envia confirmações (ACKs) para todos os processos, incluindo a si mesmo."""
-    logger.info(f"Enviando ACKs para a mensagem {message_id} para todos os pares.")
+    """Envia confirmações (ACKs) para todos os processos, exceto a si mesmo."""
+    logger.info(f"Enviando ACKs para a mensagem {message_id} para todos os pares (exceto self).")
     
     # Lógica de atraso para teste
     delay_msg_id = "MSG_PARA_ATRASAR"
@@ -36,9 +36,13 @@ async def send_acks_to_all_peers(message_id: str):
         logger.warning(f"ATRASO INDUZIDO: Atrasando ACK para msg {message_id} por {delay_seconds} segundos...")
         await asyncio.sleep(delay_seconds)
 
+    # Não envie ACK para o próprio processo; o recebimento local já conta como 1 ACK
+    my_fqdn = f"algoritmos-coord-{PROCESS_ID}.algoritmos-coord-service"
     ack_message = Ack(message_id=message_id, process_id=PROCESS_ID)
     async with httpx.AsyncClient() as client:
         for peer_name in PEERS:
+            if peer_name == my_fqdn:
+                continue
             url = f"http://{peer_name}:{PEER_PORT}/ack"
             try:
                 await client.post(url, json=ack_message.dict(), timeout=5.0)
